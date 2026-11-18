@@ -1,0 +1,32 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import express from 'express';
+
+const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
+
+export function createApp({ db }) {
+  const app = express();
+
+  app.use(express.json({ limit: '1mb' }));
+
+  app.get('/api/health', (req, res) => {
+    const { ok } = db.prepare('SELECT 1 AS ok').get();
+    res.json({ ok: ok === 1, schemaVersion: db.pragma('user_version', { simple: true }) });
+  });
+
+  app.use('/api', (req, res) => {
+    res.status(404).json({ error: 'Not found' });
+  });
+
+  app.use(express.static(publicDir));
+
+  // Express 5 forwards rejected async handlers here, so routes need no try/catch wrapper.
+  app.use((err, req, res, next) => {
+    if (res.headersSent) return next(err);
+    const status = err.status ?? err.statusCode ?? 500;
+    if (status >= 500) console.error(err);
+    res.status(status).json({ error: status >= 500 ? 'Internal server error' : err.message });
+  });
+
+  return app;
+}
