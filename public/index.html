@@ -12,6 +12,7 @@
       <h1>Money Monitoring</h1>
       <nav class="app-nav" aria-label="Розділи">
         <a href="#/" data-view="transactions">Операції</a>
+        <a href="#/summary" data-view="summary">Зведення</a>
         <a href="#/categories" data-view="categories">Категорії</a>
       </nav>
     </div>
@@ -91,6 +92,52 @@
         </div>
 
         <div id="list" class="tx-list" aria-live="polite"></div>
+      </section>
+    </div>
+
+    <!-- ===== Зведення ===== -->
+    <div id="viewSummary" class="view" hidden>
+      <section class="card" aria-labelledby="summaryTitle">
+        <h2 id="summaryTitle" class="visually-hidden">Зведена таблиця</h2>
+        <div class="summary-bar">
+          <div id="summaryPresets" class="segmented segmented-wrap" role="group" aria-label="Період">
+            <button type="button" data-preset="3m">3 міс</button>
+            <button type="button" data-preset="6m">6 міс</button>
+            <button type="button" data-preset="12m">12 міс</button>
+            <button type="button" data-preset="year">Цей рік</button>
+            <button type="button" data-preset="prevYear">Минулий рік</button>
+          </div>
+          <div class="summary-range">
+            <label><span class="visually-hidden">З місяця</span><input id="summaryFrom" type="month" required></label>
+            <span aria-hidden="true">–</span>
+            <label><span class="visually-hidden">По місяць</span><input id="summaryTo" type="month" required></label>
+          </div>
+        </div>
+        <p id="summaryRangeError" class="field-error" role="alert"></p>
+
+        <div class="totals totals-4">
+          <div class="stat"><span class="stat-label">Доходи</span><span id="summaryIncome" class="stat-value income"></span></div>
+          <div class="stat"><span class="stat-label">Витрати</span><span id="summaryExpense" class="stat-value expense"></span></div>
+          <div class="stat"><span class="stat-label">Баланс</span><span id="summaryBalance" class="stat-value"></span></div>
+          <div class="stat"><span class="stat-label">Витрати в середньому / міс</span><span id="summaryAvgExpense" class="stat-value"></span></div>
+        </div>
+
+        <div class="pivot-wrap">
+          <table id="pivotTable" class="pivot"></table>
+        </div>
+        <p id="summaryEmpty" class="empty" hidden>За цей період операцій немає.</p>
+        <p class="muted pivot-hint">Суми в таблиці округлено до гривні, точна сума — у підказці. Клікніть клітинку, щоб побачити операції.</p>
+      </section>
+
+      <section id="drilldown" class="card" aria-labelledby="drillTitle" hidden>
+        <div class="drill-head">
+          <div>
+            <h2 id="drillTitle" class="card-title drill-title"></h2>
+            <p id="drillMeta" class="muted drill-meta"></p>
+          </div>
+          <button type="button" id="drillClose" class="btn-icon" aria-label="Закрити">✕</button>
+        </div>
+        <div id="drillList"></div>
       </section>
     </div>
 

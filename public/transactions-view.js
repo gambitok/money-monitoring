@@ -404,6 +404,12 @@ export function initTransactionsView() {
   setType('expense');
 }
 
+// Used by the summary drill-down: show this day next time the view is shown.
+export function goToDay(iso) {
+  state.anchor = iso;
+  state.mode = 'day';
+}
+
 // Called when the view becomes visible: category names/colors may have changed elsewhere.
 export function showTransactionsView() {
   loadList();

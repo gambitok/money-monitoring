@@ -2,15 +2,17 @@
 import { $ } from './lib.js';
 import * as categories from './categories-store.js';
 import { initTransactionsView, showTransactionsView } from './transactions-view.js';
+import { initSummaryView, showSummaryView } from './summary-view.js';
 import { initCategoriesView, showCategoriesView } from './categories-view.js';
 
 const views = {
-  transactions: { el: $('viewTransactions'), show: showTransactionsView, title: 'Операції' },
-  categories: { el: $('viewCategories'), show: showCategoriesView, title: 'Категорії' },
+  transactions: { hash: '#/', el: $('viewTransactions'), show: showTransactionsView, title: 'Операції' },
+  summary: { hash: '#/summary', el: $('viewSummary'), show: showSummaryView, title: 'Зведення' },
+  categories: { hash: '#/categories', el: $('viewCategories'), show: showCategoriesView, title: 'Категорії' },
 };
 
 function currentView() {
-  return location.hash === '#/categories' ? 'categories' : 'transactions';
+  return Object.keys(views).find((key) => views[key].hash === location.hash) ?? 'transactions';
 }
 
 function route() {
@@ -26,6 +28,7 @@ function route() {
 
 async function init() {
   initTransactionsView();
+  initSummaryView();
   initCategoriesView();
   try {
     await categories.load();

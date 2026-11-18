@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { categoriesRouter } from './routes/categories.js';
+import { summaryRouter } from './routes/summary.js';
 import { transactionsRouter } from './routes/transactions.js';
 
 const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
@@ -18,6 +19,7 @@ export function createApp({ db }) {
 
   app.use('/api/transactions', transactionsRouter(db));
   app.use('/api/categories', categoriesRouter(db));
+  app.use('/api/summary', summaryRouter(db));
 
   app.use('/api', (req, res) => {
     res.status(404).json({ error: 'Not found' });
