@@ -109,6 +109,11 @@ test('validateTransaction: reports every invalid field at once', () => {
   assert.deepEqual(Object.keys(fields).sort(), ['amount', 'category_id', 'description', 'occurred_on', 'type']);
 });
 
+test('validateTransaction: empty amount gets a short message', () => {
+  assert.equal(fieldsOf(() => validateTransaction({ ...base, amount: '  ' })).amount, 'Вкажіть суму');
+  assert.match(fieldsOf(() => validateTransaction({ ...base, amount: 'abc' })).amount, /додатним/);
+});
+
 test('validateTransaction: description length limit', () => {
   assert.ok(fieldsOf(() => validateTransaction({ ...base, description: 'a'.repeat(501) })).description);
   assert.equal(validateTransaction({ ...base, description: 'a'.repeat(500) }).description.length, 500);

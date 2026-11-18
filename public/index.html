@@ -8,12 +8,121 @@
 </head>
 <body>
   <header class="app-header">
-    <h1>Money Monitoring</h1>
-    <span id="status" class="status">перевірка…</span>
+    <div class="app-header-inner">
+      <h1>Money Monitoring</h1>
+      <nav class="app-nav" aria-label="Розділи">
+        <a href="#/" data-view="transactions">Операції</a>
+        <a href="#/categories" data-view="categories">Категорії</a>
+      </nav>
+    </div>
   </header>
+
   <main>
-    <p class="muted">Каркас готовий. Введення операцій з'явиться на етапі 2.</p>
+    <!-- ===== Операції ===== -->
+    <div id="viewTransactions" class="view">
+      <section class="card" aria-labelledby="entryTitle">
+        <h2 id="entryTitle" class="card-title">Нова операція</h2>
+        <form id="entryForm" class="entry-form" novalidate autocomplete="off">
+          <div class="type-toggle" role="radiogroup" aria-label="Тип операції">
+            <button type="button" role="radio" data-type="expense" aria-checked="true">Витрата</button>
+            <button type="button" role="radio" data-type="income" aria-checked="false">Дохід</button>
+          </div>
+
+          <label class="field field-amount">
+            <span>Сума, ₴</span>
+            <input id="amount" name="amount" inputmode="decimal" placeholder="0,00" required>
+            <small class="field-error" data-error-for="amount"></small>
+          </label>
+
+          <label class="field field-date">
+            <span>Дата</span>
+            <input id="date" name="occurred_on" type="date" required>
+            <small class="field-error" data-error-for="occurred_on"></small>
+          </label>
+
+          <label class="field field-category">
+            <span>Категорія</span>
+            <select id="category" name="category_id"></select>
+            <small class="field-error" data-error-for="category_id"></small>
+          </label>
+
+          <div id="newCategoryRow" class="new-category-row" hidden>
+            <label class="field">
+              <span>Нова категорія</span>
+              <input id="newCategoryName" maxlength="60" aria-describedby="newCategoryError">
+            </label>
+            <button type="button" id="newCategoryCreate" class="btn-primary btn-small">Створити</button>
+            <button type="button" id="newCategoryCancel" class="btn-ghost btn-small">Скасувати</button>
+            <small id="newCategoryError" class="field-error" data-error-for="new_category"></small>
+          </div>
+
+          <label class="field field-description">
+            <span>Опис <em id="descriptionHint" class="muted">— обов'язковий без категорії</em></span>
+            <input id="description" name="description" maxlength="500" placeholder="напр. кава з собою">
+            <small class="field-error" data-error-for="description"></small>
+          </label>
+
+          <div class="form-actions">
+            <button type="submit" id="submitBtn" class="btn-primary">Додати</button>
+            <button type="button" id="cancelEditBtn" class="btn-ghost" hidden>Скасувати</button>
+            <span id="formMessage" class="form-message" role="status"></span>
+          </div>
+        </form>
+      </section>
+
+      <section class="card" aria-labelledby="periodLabel">
+        <div class="period-bar">
+          <div class="segmented" role="group" aria-label="Період">
+            <button type="button" data-mode="day">День</button>
+            <button type="button" data-mode="week">Тиждень</button>
+          </div>
+          <div class="period-nav">
+            <button type="button" id="prevBtn" class="btn-icon" aria-label="Попередній період">‹</button>
+            <h2 id="periodLabel" class="period-label"></h2>
+            <button type="button" id="nextBtn" class="btn-icon" aria-label="Наступний період">›</button>
+          </div>
+          <button type="button" id="todayBtn" class="btn-ghost">Сьогодні</button>
+        </div>
+
+        <div class="totals">
+          <div class="stat"><span class="stat-label">Доходи</span><span id="totalIncome" class="stat-value income"></span></div>
+          <div class="stat"><span class="stat-label">Витрати</span><span id="totalExpense" class="stat-value expense"></span></div>
+          <div class="stat"><span class="stat-label">Баланс</span><span id="totalBalance" class="stat-value"></span></div>
+        </div>
+
+        <div id="list" class="tx-list" aria-live="polite"></div>
+      </section>
+    </div>
+
+    <!-- ===== Категорії ===== -->
+    <div id="viewCategories" class="view" hidden>
+      <section class="card" aria-labelledby="categoryFormTitle">
+        <h2 id="categoryFormTitle" class="card-title">Нова категорія</h2>
+        <form id="categoryForm" class="category-form" novalidate autocomplete="off">
+          <div class="type-toggle" role="radiogroup" aria-label="Тип категорії">
+            <button type="button" role="radio" data-type="expense" aria-checked="true">Витрата</button>
+            <button type="button" role="radio" data-type="income" aria-checked="false">Дохід</button>
+          </div>
+          <label class="field category-name-field">
+            <span>Назва</span>
+            <input id="categoryName" maxlength="60" placeholder="напр. Продукти" aria-describedby="categoryNameError">
+          </label>
+          <label class="field category-color-field">
+            <span>Колір</span>
+            <input id="categoryColor" type="color">
+          </label>
+          <button type="submit" class="btn-primary">Додати</button>
+          <small id="categoryNameError" class="field-error category-form-error"></small>
+          <span id="categoryMessage" class="form-message category-form-message" role="status"></span>
+        </form>
+      </section>
+
+      <section class="card" aria-label="Список категорій">
+        <div id="categoryLists"></div>
+      </section>
+    </div>
   </main>
+
   <script type="module" src="app.js"></script>
 </body>
 </html>

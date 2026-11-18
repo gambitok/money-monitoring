@@ -28,6 +28,7 @@
 - `npm install`, `npm start` → http://localhost:3001. `npm run dev` перезапускає сервер при зміні файлів (`node --watch`). Зміни в `public/` потребують лише оновлення сторінки.
 - `npm test`: `node --test` знаходить `tests/*.test.js`. `tests/helpers.js` має `startTestServer()`, який створює тимчасову БД і повертає `{ db, baseUrl, close }`.
 - `launch.ps1`: запускає сервер, якщо він не працює (перевіряє `/api/health`), і відкриває браузер.
+- Перевірка UI в браузері — **тільки** через конфіг `money-monitoring-demo` у `.claude/launch.json` (порт 3002, `DB_FILE=data/demo.db`). Конфіг `money-monitoring` працює з реальною `data/money.db`, тож тестові операції через нього не вводь.
 - Змінні оточення: `PORT` (3001), `DB_FILE` (`data/money.db`).
 
 ## Модель даних
@@ -67,9 +68,18 @@
 - `src/validate.js`: `parseAmount`, `isValidDate`, `validateTransaction`, `validateCategory`. Валідатори кидають `ValidationError` (status 400, `fields`: поле → повідомлення українською), а error handler віддає `400 { error, fields }`. `validateTransaction` приймає повний об'єкт: для PATCH спершу злий збережений рядок із патчем. Існування і тип категорії валідатор не перевіряє, це робить роут через БД.
 - `parseAmount`: пробіли (зокрема NBSP і narrow NBSP) — роздільник тисяч. Один `,` або `.` — десятковий роздільник. Якщо є обидва, десятковий той, що останній, і ціла частина має бути правильно згрупована. `"1,234"` відхиляється, а не читається як 1234. Максимум 2 знаки після коми, сума до `MAX_AMOUNT_MINOR`. Числа з Excel пропускаються з допуском на похибку float.
 
-Цільові файли наступних етапів:
-- `src/routes/*.js`: окремий файл для кожного ресурсу (`transactions`, `categories`, `summary`, `import`).
-- `public/`: `index.html`, `app.js`, `styles.css`.
+- `src/routes/*.js`: окремий роутер-фабрика `xxxRouter(db)` для кожного ресурсу (`transactions`, `categories`). `params.js` містить `parseIdParam` (некоректний id дає 404, а не 400) і `pick` (whitelist полів із тіла запиту). Помилка з `err.details` додає ці поля у JSON-відповідь, наприклад `conflict_id`.
+  - `transactions`: відповідь рядка завжди включає `category_name` і `category_color` (LEFT JOIN). `GET /` повертає `{ items, totals: { income, expense, balance } }`, сортування `occurred_on DESC, id DESC`. Фільтри: `from`, `to` (включно), `type`, `category_id` (id або `none` для операцій без категорії). POST і PATCH беруть лише `EDITABLE_FIELDS`, тож `source`, `import_hash` і `currency` клієнт не задає. PATCH зливає збережений рядок із патчем і валідує результат. Нове `amount` перекриває збережене `amount_minor`. Архівну категорію не можна призначити заново, але вона лишається на операції, яка вже її мала.
+  - `categories`: сортування через `Intl.Collator('uk')` у JS, бо SQLite сортує за кодами символів (Є, І, Ї опиняються перед А, а Ґ після Я). `include_archived=1` повертає й архівні. Кожен рядок містить `transaction_count`. Унікальність назви перевіряє `assertUniqueName` через `toLocaleLowerCase('uk')`, бо індекс `UNIQUE(name, type)` чутливий до регістру, а `NOCASE` розуміє лише ASCII. Конфлікт дає `409 { fields.name, conflict_id }`. Тип змінюється лише поки немає операцій (так само гарантує тригер). `DELETE` невикористану категорію видаляє, а використану архівує: `{ deleted, archived, category? }`.
+- `public/`: нативні ES-модулі без бандлера.
+  - `app.js`: точка входу, hash-роутинг (`#/` — операції, `#/categories` — категорії). Перемикає `hidden` у `#viewXxx` і викликає `showXxxView()`, коли в'юха стає видимою (оновити дані).
+  - `lib.js`: `h(tag, attrs, ...children)` для DOM (текст через text nodes, `style` через `setProperty`, `value` як властивість), `api()` і `ApiError` (`status`, `body`, `fields`), дати (UTC за календарними днями, тиждень з понеділка), гроші (`formatMoney`, `formatSigned`, `minorToInput`), `plural()` з `Intl.PluralRules('uk')`, `readPref`/`writePref` (`localStorage` з try/catch).
+  - `categories-store.js`: єдине джерело категорій на сторінці. `load`, `create`, `update`, `remove` перезавантажують список і сповіщають підписників (`subscribe`). `nextColor(type)` повертає перший колір `PALETTE`, якого ще немає серед активних категорій цього типу.
+  - `transactions-view.js`: форма і список за день або тиждень. `state.selectedCategoryId` — джерело правди для вибраної категорії, а `<select>` лише відображає його. Спеціальна опція `__new` відкриває рядок створення категорії, де Enter створює категорію, а не відправляє форму. Після збереження форма лишає тип, дату і категорію. Якщо дата поза поточним періодом, список переходить на неї. `loadSeq` відкидає застарілі відповіді. Режим day/week зберігається в `mm.mode`.
+  - `categories-view.js`: повністю перемальовує список на кожну зміну в store (`render()`). Inline-стан у `state.editingId` і `state.rowError`.
+- `element.replaceChildren(a && b)` виводить текст `"false"`, тому falsy-частини фільтруй або передавай їх через `h()`, який їх пропускає.
+
+Цільові файли наступних етапів: `src/routes/summary.js`, `src/routes/import.js`.
 
 ## Застереження
 

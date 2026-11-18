@@ -1,6 +1,8 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
+import { categoriesRouter } from './routes/categories.js';
+import { transactionsRouter } from './routes/transactions.js';
 
 const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 
@@ -13,6 +15,9 @@ export function createApp({ db }) {
     const { ok } = db.prepare('SELECT 1 AS ok').get();
     res.json({ ok: ok === 1, schemaVersion: db.pragma('user_version', { simple: true }) });
   });
+
+  app.use('/api/transactions', transactionsRouter(db));
+  app.use('/api/categories', categoriesRouter(db));
 
   app.use('/api', (req, res) => {
     res.status(404).json({ error: 'Not found' });
@@ -27,6 +32,7 @@ export function createApp({ db }) {
     if (status >= 500) console.error(err);
     const body = { error: status >= 500 ? 'Internal server error' : err.message };
     if (err.fields) body.fields = err.fields;
+    if (err.details) Object.assign(body, err.details);
     res.status(status).json(body);
   });
 

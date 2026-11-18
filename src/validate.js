@@ -94,7 +94,9 @@ export function validateTransaction(input) {
       && input.amount_minor <= MAX_AMOUNT_MINOR ? input.amount_minor : null)
     : parseAmount(input.amount);
   if (amount !== null) value.amount_minor = amount;
-  else errors.amount = 'Сума має бути додатним числом, не більше 2 знаків після коми';
+  else if (input.amount_minor === undefined && (input.amount ?? '').toString().trim() === '') {
+    errors.amount = 'Вкажіть суму';
+  } else errors.amount = 'Сума має бути додатним числом, не більше 2 знаків після коми';
 
   if (isValidDate(input.occurred_on)) value.occurred_on = input.occurred_on;
   else errors.occurred_on = 'Дата має бути у форматі РРРР-ММ-ДД';
