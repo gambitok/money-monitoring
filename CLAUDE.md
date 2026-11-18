@@ -32,31 +32,21 @@
 
 ## Модель даних
 
-```sql
-categories (
-  id          INTEGER PRIMARY KEY,
-  name        TEXT NOT NULL,
-  type        TEXT NOT NULL CHECK (type IN ('income','expense')),
-  color       TEXT,
-  archived_at TEXT,
-  created_at  TEXT NOT NULL,
-  UNIQUE (name, type)
-)
+Схема — у міграції 1 в `src/db.js`. Дві таблиці:
 
-transactions (
-  id           INTEGER PRIMARY KEY,
-  type         TEXT NOT NULL CHECK (type IN ('income','expense')),
-  amount_minor INTEGER NOT NULL CHECK (amount_minor > 0),
-  currency     TEXT NOT NULL DEFAULT 'UAH',
-  occurred_on  TEXT NOT NULL,              -- 'YYYY-MM-DD'
-  category_id  INTEGER REFERENCES categories(id),
-  description  TEXT,
-  source       TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual','import')),
-  import_hash  TEXT UNIQUE,                -- захист від дублікатів під час імпорту
-  created_at   TEXT NOT NULL,
-  updated_at   TEXT NOT NULL
-)
-```
+- `categories`: `name`, `type` (`income`/`expense`), `color`, `archived_at`, `created_at`. Пара `(name, type)` унікальна.
+- `transactions`: `type`, `amount_minor`, `currency` (`'UAH'`), `occurred_on` (`YYYY-MM-DD`), `category_id` (nullable), `description`, `source` (`manual`/`import`), `import_hash` (унікальний, nullable), `created_at`, `updated_at`. Індекси по `occurred_on` і `category_id`.
+
+Часові мітки — ISO UTC з мілісекундами (`strftime('%Y-%m-%dT%H:%M:%fZ','now')`). `updated_at` при UPDATE оновлює код, тригера на це немає.
+
+**Інваріанти, які БД гарантує сама** (CHECK, FK і тригери; тести в `tests/schema.test.js`):
+- `amount_minor` — ціле число більше 0. Числовий рядок SQLite приводить до INTEGER через affinity.
+- `occurred_on` — реальна дата: `date(x) IS x`, тож `2026-02-30` не пройде.
+- Без категорії потрібен непорожній опис.
+- Тип категорії збігається з типом операції (тригери на INSERT і UPDATE).
+- Категорію з операціями не можна видалити (FK RESTRICT) і не можна змінити їй тип (тригер). Її можна лише архівувати.
+
+Валідація в API дублює ці правила, щоб повернути зрозумілі помилки. Для помилок констрейнтів, які до API не дійшли, БД — остання лінія захисту.
 
 ## Правила домену
 
@@ -74,9 +64,11 @@ transactions (
 - `src/app.js`: `createApp({ db })` збирає Express-застосунок (JSON-парсер, `/api/*`, JSON 404 для невідомих `/api`, статика, error handler). Тести імпортують саме його. Error handler віддає `err.status` з `err.message`, а для 5xx — загальне повідомлення.
 - `src/db.js`: `openDb(file)` і `migrate(db, list)`. Масив `migrations` тільки доповнюється, номер версії = індекс + 1 і зберігається в `PRAGMA user_version`. Кожна міграція виконується у власній транзакції. Якщо БД новіша за код, `migrate` падає.
 
+- `src/validate.js`: `parseAmount`, `isValidDate`, `validateTransaction`, `validateCategory`. Валідатори кидають `ValidationError` (status 400, `fields`: поле → повідомлення українською), а error handler віддає `400 { error, fields }`. `validateTransaction` приймає повний об'єкт: для PATCH спершу злий збережений рядок із патчем. Існування і тип категорії валідатор не перевіряє, це робить роут через БД.
+- `parseAmount`: пробіли (зокрема NBSP і narrow NBSP) — роздільник тисяч. Один `,` або `.` — десятковий роздільник. Якщо є обидва, десятковий той, що останній, і ціла частина має бути правильно згрупована. `"1,234"` відхиляється, а не читається як 1234. Максимум 2 знаки після коми, сума до `MAX_AMOUNT_MINOR`. Числа з Excel пропускаються з допуском на похибку float.
+
 Цільові файли наступних етапів:
 - `src/routes/*.js`: окремий файл для кожного ресурсу (`transactions`, `categories`, `summary`, `import`).
-- `src/validate.js`: валідація вхідних даних і парсинг сум. Помилки повертаються як `400 { error, fields }`.
 - `public/`: `index.html`, `app.js`, `styles.css`.
 
 ## Застереження

@@ -25,7 +25,9 @@ export function createApp({ db }) {
     if (res.headersSent) return next(err);
     const status = err.status ?? err.statusCode ?? 500;
     if (status >= 500) console.error(err);
-    res.status(status).json({ error: status >= 500 ? 'Internal server error' : err.message });
+    const body = { error: status >= 500 ? 'Internal server error' : err.message };
+    if (err.fields) body.fields = err.fields;
+    res.status(status).json(body);
   });
 
   return app;

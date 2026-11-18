@@ -10,7 +10,7 @@
 - `npm test` з першим тестом на health.
 - `launch.ps1`, оновлений README.
 
-## Етап 1. Модель даних ⬜
+## Етап 1. Модель даних ✅
 
 - Міграція 1: таблиці `categories` і `transactions` з індексами `(occurred_on)` і `(category_id)`.
 - `src/validate.js`: `parseAmount("1 234,50") → 123450`, перевірка дати, правило «без категорії потрібен опис».

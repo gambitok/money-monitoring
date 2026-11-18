@@ -4,7 +4,65 @@ import Database from 'better-sqlite3';
 
 // Append-only: the array index + 1 is the schema version stored in PRAGMA user_version.
 // Never edit or reorder a migration that has already been applied; add a new one instead.
-export const migrations = [];
+export const migrations = [
+  // 1: categories and transactions
+  (db) => db.exec(`
+    CREATE TABLE categories (
+      id          INTEGER PRIMARY KEY,
+      name        TEXT NOT NULL CHECK (length(trim(name)) > 0),
+      type        TEXT NOT NULL CHECK (type IN ('income', 'expense')),
+      color       TEXT,
+      archived_at TEXT,
+      created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      UNIQUE (name, type)
+    );
+
+    CREATE TABLE transactions (
+      id           INTEGER PRIMARY KEY,
+      type         TEXT NOT NULL CHECK (type IN ('income', 'expense')),
+      amount_minor INTEGER NOT NULL CHECK (typeof(amount_minor) = 'integer' AND amount_minor > 0),
+      currency     TEXT NOT NULL DEFAULT 'UAH' CHECK (length(currency) = 3),
+      occurred_on  TEXT NOT NULL CHECK (date(occurred_on) IS occurred_on),
+      category_id  INTEGER REFERENCES categories (id) ON DELETE RESTRICT,
+      description  TEXT,
+      source       TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'import')),
+      import_hash  TEXT UNIQUE,
+      created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      -- No category means the description is the only hint of what the money was for.
+      CHECK (category_id IS NOT NULL OR length(trim(coalesce(description, ''))) > 0)
+    );
+
+    CREATE INDEX transactions_occurred_on ON transactions (occurred_on);
+    CREATE INDEX transactions_category_id ON transactions (category_id);
+
+    -- A transaction may only use a category of the same type (income/expense).
+    CREATE TRIGGER transactions_category_type_insert
+    BEFORE INSERT ON transactions
+    WHEN NEW.category_id IS NOT NULL
+     AND EXISTS (SELECT 1 FROM categories WHERE id = NEW.category_id AND type IS NOT NEW.type)
+    BEGIN
+      SELECT RAISE(ABORT, 'category type does not match transaction type');
+    END;
+
+    CREATE TRIGGER transactions_category_type_update
+    BEFORE UPDATE OF type, category_id ON transactions
+    WHEN NEW.category_id IS NOT NULL
+     AND EXISTS (SELECT 1 FROM categories WHERE id = NEW.category_id AND type IS NOT NEW.type)
+    BEGIN
+      SELECT RAISE(ABORT, 'category type does not match transaction type');
+    END;
+
+    -- Changing a category's type would silently break every transaction already using it.
+    CREATE TRIGGER categories_type_locked
+    BEFORE UPDATE OF type ON categories
+    WHEN NEW.type IS NOT OLD.type
+     AND EXISTS (SELECT 1 FROM transactions WHERE category_id = OLD.id)
+    BEGIN
+      SELECT RAISE(ABORT, 'cannot change type of a category that has transactions');
+    END;
+  `),
+];
 
 export function openDb(file) {
   if (file !== ':memory:') {
