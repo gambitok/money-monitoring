@@ -62,7 +62,9 @@ button, input, select { font: inherit; color: inherit; }
 
 .app-header h1 { margin: 0; font-size: 1.15rem; }
 
-.app-nav { display: flex; gap: 4px; }
+/* Five tabs do not fit a phone: the nav scrolls sideways instead of widening the page. */
+.app-nav { display: flex; gap: 4px; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.app-nav a { white-space: nowrap; }
 
 .app-nav a {
   color: var(--muted);
@@ -268,6 +270,9 @@ button:disabled { cursor: default; opacity: 0.5; }
 }
 
 .stat-label { font-size: 0.8rem; color: var(--muted); }
+.stat-usd { font-size: 0.78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.stat-usd:empty, .stat-usd-rate:empty { display: none; }
+.stat-usd-rate { font-size: 0.78rem; margin: -6px 0 12px; }
 .stat-value { font-size: 1.1rem; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 
 .income { color: var(--income); }
@@ -458,6 +463,19 @@ button:disabled { cursor: default; opacity: 0.5; }
 
 .segmented-wrap { flex-wrap: wrap; }
 
+.summary-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+.summary-year select {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.summary-year select.is-active { background: var(--surface); color: var(--text); font-weight: 600; border-color: var(--accent); }
+
 .summary-range { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
 .summary-range label { flex: 1 1 0; min-width: 0; }
 
@@ -598,5 +616,177 @@ button:disabled { cursor: default; opacity: 0.5; }
 .drill-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
 .drill-title { margin-bottom: 2px; }
 .drill-meta { margin: 0 0 8px; font-size: 0.9rem; }
-.drill-row { grid-template-columns: 1fr auto; }
+.drill-row { grid-template-columns: 1fr auto auto; }
 .drill-date { white-space: nowrap; font-size: 0.85rem; }
+
+/* ---------- month view (spreadsheet-like) ---------- */
+
+/* Wide tables get more room than the 960px forms. */
+main:has(#viewMonth:not([hidden])),
+main:has(#viewSummary:not([hidden])) { max-width: 1400px; }
+
+.month-pick { display: flex; align-items: center; gap: 8px; }
+.month-pick input {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+
+.month-table { font-size: 0.85rem; }
+.month-table td, .month-table th { padding: 3px 6px; }
+.month-table .pivot-cat.month-day { min-width: 84px; max-width: 84px; white-space: nowrap; }
+.month-day-btn { font-variant-numeric: tabular-nums; text-decoration: none; color: var(--text); }
+.month-day-btn:hover { text-decoration: underline; }
+.month-weekday { font-size: 0.75rem; margin-left: 6px; }
+
+.month-col { min-width: 64px; max-width: 96px; white-space: normal !important; vertical-align: bottom; }
+.month-col-name {
+  display: inline-block;
+  line-height: 1.15;
+  border-bottom: 3px solid var(--chip-color);
+  padding-bottom: 2px;
+}
+
+.month-cell { cursor: default; }
+.month-table td.is-zero { opacity: 1; }
+
+.month-desc {
+  min-width: 220px;
+  white-space: normal !important;
+  color: var(--muted);
+  text-align: left;
+}
+
+/* One row background for every cell; the heat tint is mixed over it, so weekend rows stay even. */
+.month-table tbody tr { --row-bg: var(--surface); }
+.month-table tbody tr.is-weekend { --row-bg: var(--surface-2); }
+.month-table tbody th,
+.month-table tbody td { background: var(--row-bg); }
+/* Highlight by the owner's thresholds: > 2 000 ₴ and > 10 000 ₴ per day × category. */
+.month-table tbody td.month-cell.heat-1 { background: color-mix(in srgb, var(--expense) 16%, var(--row-bg)); }
+.month-table tbody td.month-cell.heat-2 { background: color-mix(in srgb, var(--expense) 38%, var(--row-bg)); font-weight: 700; }
+
+.month-table td.month-cell, .month-table td.pivot-total { padding: 0 2px; }
+.month-table .cell-btn { padding: 4px; }
+.month-add { color: transparent; }
+.month-add:hover, .month-add:focus-visible { color: var(--accent); background: var(--surface-2); }
+.month-table tbody tr.is-today th { box-shadow: inset 3px 0 0 var(--accent); }
+
+.month-table tfoot th, .month-table tfoot td { border-top: 2px solid var(--border); padding-top: 6px; padding-bottom: 6px; }
+.month-grand { color: var(--expense); font-size: 1rem; }
+
+.month-income-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.month-income-title { margin: 0; color: var(--income); }
+.month-income-date { font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.month-income-total { margin: 12px 0 0; padding-top: 8px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; }
+
+/* ---------- stats view ---------- */
+
+main:has(#viewStats:not([hidden])) { max-width: 1400px; }
+
+.stats-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.stats-period select {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-weight: 600;
+}
+.stats-search { margin: 12px 0 8px; }
+.stats-search code { font-size: 0.8rem; background: var(--surface-2); padding: 0 4px; border-radius: 4px; font-style: normal; }
+
+.stats-cats-head { display: flex; align-items: baseline; gap: 8px; font-size: 0.85rem; margin-bottom: 6px; }
+.stats-cats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+
+.chip-toggle {
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 4px 10px;
+}
+.chip-toggle[aria-pressed='true'] {
+  border-color: var(--chip-color);
+  background: color-mix(in srgb, var(--chip-color) 22%, var(--surface));
+  color: var(--text);
+  font-weight: 600;
+}
+.chip-toggle.is-archived { opacity: 0.6; }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+@media (min-width: 900px) {
+  .stats-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+
+.stats-note { font-size: 0.8rem; margin: -4px 0 10px; }
+
+.bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  align-items: baseline;
+}
+.bar-label { text-align: left; overflow-wrap: anywhere; }
+.bar-value { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.bar-track { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+.bar-fill { display: block; height: 100%; border-radius: 4px; background: var(--chip-color); }
+.bar-meta { grid-column: 1 / -1; font-size: 0.75rem; }
+
+.stats-table { font-size: 0.875rem; }
+.stats-table th, .stats-table td { padding: 6px 8px; }
+.stats-table td:first-child { white-space: normal; }
+.stats-table .link-btn { text-align: left; color: var(--text); text-decoration: none; }
+.stats-table .link-btn:hover { text-decoration: underline; }
+
+.stats-words { display: flex; flex-wrap: wrap; gap: 6px; }
+.word-chip {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.85rem;
+}
+.word-chip:hover { border-color: var(--accent); }
+.word-chip .muted { font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+
+/* ---------- modal ---------- */
+
+.modal {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 20px 50px rgb(0 0 0 / 0.35);
+}
+.modal::backdrop { background: rgb(0 0 0 / 0.5); }
+.modal-body { padding: 16px; }
+.modal-form { grid-template-columns: 1fr 1fr !important; }
+.modal-form .field-category, .modal-form .field-description, .modal-form .form-message { grid-column: 1 / -1; }
+.modal-form .form-message:empty { display: none; }
+.modal-head {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.modal-title { margin: 0; font-size: 1.05rem; }
+.modal-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.modal-list { margin: 8px 0; }
+.danger-text { color: var(--danger); margin-left: auto; }

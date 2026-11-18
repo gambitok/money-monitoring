@@ -1,15 +1,18 @@
 // "Зведення" view: category × month pivot with drill-down into transactions.
 import {
-  $, h, api, readPref, writePref, todayIso, isoToUtc, dayFmt, formatMoney, formatSigned, plural, TYPE_LABELS,
+  $, h, api, todayIso, isoToUtc, dayFmt, formatMoney, formatSigned, plural, TYPE_LABELS,
 } from './lib.js';
 import { goToDay } from './transactions-view.js';
+import { openTxModal } from './tx-modal.js';
 
-const PRESETS = ['3m', '6m', '12m', 'year', 'prevYear'];
+// Presets: '3m' | '6m' | '12m' (buttons), or a whole year "y:2025" (picked in the year dropdown).
+const YEAR_PRESET_RE = /^y:\d{4}$/;
 const SECTION_ORDER = ['expense', 'income'];
 const COUNT_WORDS = ['операція', 'операції', 'операцій'];
 
 const els = {
   presetButtons: [...document.querySelectorAll('#summaryPresets [data-preset]')],
+  year: $('summaryYear'),
   from: $('summaryFrom'),
   to: $('summaryTo'),
   rangeError: $('summaryRangeError'),
@@ -27,7 +30,9 @@ const els = {
 };
 
 const state = {
-  preset: PRESETS.includes(readPref('summaryPreset', '6m')) ? readPref('summaryPreset', '6m') : '6m',
+  // The page always opens on the current year (owner's choice), not on a remembered preset.
+  preset: `y:${currentYear()}`,
+  years: [],
   from: null,
   to: null,
   data: null,
@@ -38,7 +43,9 @@ let loadSeq = 0;
 
 // ---------- months ----------
 
-const currentMonth = () => todayIso().slice(0, 7);
+// Function declarations (hoisted): currentYear() runs while `state` is initialized above.
+function currentMonth() { return todayIso().slice(0, 7); }
+function currentYear() { return Number(todayIso().slice(0, 4)); }
 
 function addMonths(month, n) {
   const [y, m] = month.split('-').map(Number);
@@ -53,12 +60,14 @@ function lastDayOfMonth(month) {
 
 function presetRange(preset) {
   const now = currentMonth();
-  const year = now.slice(0, 4);
+  if (YEAR_PRESET_RE.test(preset)) {
+    const year = preset.slice(2);
+    // The current year stops at this month, so empty future months do not dilute the averages.
+    return { from: `${year}-01`, to: Number(year) === currentYear() ? now : `${year}-12` };
+  }
   switch (preset) {
     case '3m': return { from: addMonths(now, -2), to: now };
     case '12m': return { from: addMonths(now, -11), to: now };
-    case 'year': return { from: `${year}-01`, to: now };
-    case 'prevYear': return { from: `${Number(year) - 1}-01`, to: `${Number(year) - 1}-12` };
     default: return { from: addMonths(now, -5), to: now };
   }
 }
@@ -75,7 +84,6 @@ const formatWhole = (minor) => wholeFmt.format(Math.round(minor / 100));
 
 function applyPreset(preset) {
   state.preset = preset;
-  writePref('summaryPreset', preset);
   Object.assign(state, presetRange(preset));
   load();
 }
@@ -88,8 +96,39 @@ function onRangeInput() {
   load();
 }
 
-async function load() {
+async function loadYears() {
+  let years;
+  try {
+    ({ years } = await api('GET', '/summary/years'));
+  } catch {
+    // A server started before /summary/years existed answers 404: derive the years from the
+    // transactions themselves instead of silently offering only the current year.
+    try {
+      const { items } = await api('GET', '/transactions');
+      years = items.map((t) => Number(t.occurred_on.slice(0, 4)));
+    } catch {
+      years = [];
+    }
+  }
+  // The current year is always offered, even before its first transaction.
+  state.years = [...new Set([currentYear(), ...years])].sort((a, b) => b - a);
+  els.year.replaceChildren(
+    // Shown while a non-year period (3/6/12 months or a custom range) is selected.
+    h('option', { value: '', disabled: true }, 'Рік'),
+    ...state.years.map((year) => h('option', { value: String(year) }, String(year))),
+  );
+  markPressed();
+}
+
+function markPressed() {
   for (const btn of els.presetButtons) btn.setAttribute('aria-pressed', String(btn.dataset.preset === state.preset));
+  const year = YEAR_PRESET_RE.test(state.preset ?? '') ? state.preset.slice(2) : '';
+  els.year.value = year;
+  els.year.classList.toggle('is-active', year !== '');
+}
+
+async function load() {
+  markPressed();
   els.from.value = state.from;
   els.to.value = state.to;
   els.rangeError.textContent = '';
@@ -114,6 +153,32 @@ async function load() {
 
 // ---------- pivot table ----------
 
+const usdFmt = new Intl.NumberFormat('uk-UA', { maximumFractionDigits: 0 });
+const rateFmt = new Intl.NumberFormat('uk-UA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// Small "≈ $X" lines under the tiles, at the period's average rate from freelance income.
+function renderUsd(data) {
+  const rate = data.usd?.rate;
+  const values = {
+    summaryIncome: data.income.total,
+    summaryExpense: data.expense.total,
+    summaryBalance: data.balance.total,
+    summaryAvgExpense: data.expense.total / data.months.length,
+  };
+  for (const [id, minor] of Object.entries(values)) {
+    const el = document.querySelector(`[data-usd-for="${id}"]`);
+    if (!el) continue;
+    if (!rate) { el.textContent = ''; continue; }
+    const usd = Math.round(minor / 100 / rate);
+    el.textContent = `≈ ${usd < 0 ? '−' : ''}$${usdFmt.format(Math.abs(usd))}`;
+  }
+  $('summaryUsdRate').textContent = rate
+    ? `Курс $: ${rateFmt.format(rate)} ₴ — ${data.usd.source === 'period'
+      ? 'середній за період (за доходами з фрилансу)'
+      : 'середній за весь час (у цьому періоді курсу немає)'}`
+    : '';
+}
+
 function render(data) {
   const { months } = data;
   els.income.textContent = formatMoney(data.income.total);
@@ -121,6 +186,7 @@ function render(data) {
   els.balance.textContent = `${data.balance.total < 0 ? '−' : ''}${formatMoney(Math.abs(data.balance.total))}`;
   els.balance.className = `stat-value ${data.balance.total < 0 ? 'expense' : data.balance.total > 0 ? 'income' : ''}`;
   els.avgExpense.textContent = formatMoney(Math.round(data.expense.total / months.length));
+  renderUsd(data);
 
   const isEmpty = data.income.rows.length === 0 && data.expense.rows.length === 0;
   els.empty.hidden = !isEmpty;
@@ -265,6 +331,9 @@ function renderDrillRow(tx, showCategory) {
       tx.description && h('span', { class: 'tx-description' }, tx.description),
     ),
     h('span', { class: `tx-amount ${tx.type}` }, formatSigned(tx.type, tx.amount_minor)),
+    h('div', { class: 'tx-actions' },
+      h('button', { type: 'button', class: 'btn-icon', title: 'Редагувати', 'aria-label': 'Редагувати', onclick: () => openTxModal({ tx, onChanged: load }) }, '✎'),
+    ),
   );
 }
 
@@ -272,6 +341,9 @@ function renderDrillRow(tx, showCategory) {
 
 export function initSummaryView() {
   for (const btn of els.presetButtons) btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
+  els.year.addEventListener('change', () => {
+    if (els.year.value) applyPreset(`y:${els.year.value}`);
+  });
   els.from.addEventListener('change', onRangeInput);
   els.to.addEventListener('change', onRangeInput);
   els.drillClose.addEventListener('click', closeDrill);
@@ -283,4 +355,5 @@ export function showSummaryView() {
   // A relative preset ("last 6 months") follows the calendar if the page stayed open over a month change.
   if (state.preset) Object.assign(state, presetRange(state.preset));
   load();
+  loadYears(); // new data may have added a year
 }

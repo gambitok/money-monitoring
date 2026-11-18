@@ -3,6 +3,8 @@ import { ValidationError } from '../validate.js';
 
 export const MAX_MONTHS = 60;
 
+const USD_RATE_RE = /\$(\d+(?:,\d+)?) за курсом \d+(?:,\d+)?/;
+
 const collator = new Intl.Collator('uk', { sensitivity: 'base', numeric: true });
 
 function isValidMonth(value) {
@@ -36,6 +38,39 @@ export function summaryRouter(db) {
     WHERE t.occurred_on >= @start AND t.occurred_on < @end
     GROUP BY t.type, t.category_id, month
   `);
+
+  const years = db.prepare(`
+    SELECT DISTINCT CAST(substr(occurred_on, 1, 4) AS INTEGER) AS year FROM transactions ORDER BY year DESC
+  `).pluck();
+
+  // USD rate: income descriptions written as "$2215 за курсом 43" (freelance, see the legacy import).
+  const ratedIncome = db.prepare(`
+    SELECT amount_minor, description FROM transactions
+    WHERE type = 'income' AND description LIKE '%за курсом%'
+      AND (@start IS NULL OR (occurred_on >= @start AND occurred_on < @end))
+  `);
+
+  // Weighted average rate (total UAH / total USD) of the period; if the period has no rated
+  // income (e.g. 2024), the all-time average. null when no rate is known at all.
+  function usdRate(start, end) {
+    for (const [source, params] of [['period', { start, end }], ['all', { start: null, end: null }]]) {
+      let uah = 0;
+      let usd = 0;
+      for (const row of ratedIncome.all(params)) {
+        const m = USD_RATE_RE.exec(row.description);
+        if (!m) continue;
+        uah += row.amount_minor / 100;
+        usd += Number(m[1].replace(',', '.'));
+      }
+      if (usd > 0) return { rate: Math.round((uah / usd) * 100) / 100, source };
+    }
+    return null;
+  }
+
+  // Years that have at least one transaction, newest first (for the year buttons).
+  router.get('/years', (req, res) => {
+    res.json({ years: years.all() });
+  });
 
   router.get('/', (req, res) => {
     const { from, to } = req.query;
@@ -88,7 +123,10 @@ export function summaryRouter(db) {
     const balance = { cells: zeroCells(months), total: sections.income.total - sections.expense.total };
     for (const m of months) balance.cells[m] = sections.income.totals[m] - sections.expense.totals[m];
 
-    res.json({ from, to, months, ...sections, balance });
+    res.json({
+      from, to, months, ...sections, balance,
+      usd: usdRate(`${from}-01`, `${nextMonth(to)}-01`), // { rate, source: 'period' | 'all' } | null
+    });
   });
 
   return router;

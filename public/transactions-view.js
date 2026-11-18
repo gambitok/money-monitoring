@@ -1,9 +1,10 @@
 // "Операції" view: quick entry form + day/week list with totals.
 import {
   $, h, api, readPref, writePref, todayIso, isoToUtc, addDays, startOfWeek,
-  dayFmt, shortDateFmt, yearFmt, formatMoney, formatSigned, minorToInput,
+  dayFmt, shortDateFmt, yearFmt, formatMoney, formatSigned,
 } from './lib.js';
 import * as categories from './categories-store.js';
+import { openTxModal } from './tx-modal.js';
 
 const NEW_CATEGORY = '__new';
 
@@ -20,9 +21,7 @@ const els = {
   description: $('description'),
   descriptionHint: $('descriptionHint'),
   submitBtn: $('submitBtn'),
-  cancelEditBtn: $('cancelEditBtn'),
   formMessage: $('formMessage'),
-  entryTitle: $('entryTitle'),
   modeButtons: [...document.querySelectorAll('.segmented [data-mode]')],
   periodLabel: $('periodLabel'),
   prevBtn: $('prevBtn'),
@@ -38,7 +37,6 @@ const state = {
   type: 'expense',
   mode: readPref('mode', 'day') === 'week' ? 'week' : 'day',
   anchor: todayIso(),
-  editing: null, // transaction being edited, or null
   selectedCategoryId: null, // remembered across type switches and re-renders
 };
 
@@ -63,9 +61,6 @@ function setType(type) {
 
 function renderCategoryOptions() {
   const options = categories.active(state.type);
-  // An archived category stays selectable only on the transaction that already has it.
-  const current = state.editing && categories.byId(state.editing.category_id);
-  if (current?.archived_at && current.type === state.type) options.push(current);
 
   els.category.replaceChildren(
     h('option', { value: '' }, '— без категорії —'),
@@ -189,39 +184,7 @@ function showMessage(text, isError = false) {
   if (text && !isError) messageTimer = setTimeout(() => { els.formMessage.textContent = ''; }, 3000);
 }
 
-// ---------- edit ----------
-
-function startEdit(tx) {
-  state.editing = tx;
-  clearErrors();
-  state.selectedCategoryId = tx.category_id;
-  setType(tx.type);
-  els.amount.value = minorToInput(tx.amount_minor);
-  els.date.value = tx.occurred_on;
-  els.description.value = tx.description ?? '';
-  els.entryTitle.textContent = 'Редагування операції';
-  els.submitBtn.textContent = 'Зберегти';
-  els.cancelEditBtn.hidden = false;
-  els.form.classList.add('is-editing');
-  els.form.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  els.amount.focus();
-  els.amount.select();
-  renderList(lastData); // highlight the row being edited
-}
-
-function stopEdit() {
-  state.editing = null;
-  els.entryTitle.textContent = 'Нова операція';
-  els.submitBtn.textContent = 'Додати';
-  els.cancelEditBtn.hidden = true;
-  els.form.classList.remove('is-editing');
-  els.amount.value = '';
-  els.description.value = '';
-  clearErrors();
-  closeNewCategory();
-  renderCategoryOptions();
-  renderList(lastData);
-}
+// Editing happens in the shared modal (tx-modal.js); this form only adds new transactions.
 
 async function submitForm(event) {
   event.preventDefault();
@@ -237,17 +200,11 @@ async function submitForm(event) {
 
   els.submitBtn.disabled = true;
   try {
-    if (state.editing) {
-      await api('PATCH', `/transactions/${state.editing.id}`, payload);
-      stopEdit();
-      showMessage('Збережено');
-    } else {
-      const saved = await api('POST', '/transactions', payload);
-      // Keep type, date and category for fast entry of the next one; clear the rest.
-      els.amount.value = '';
-      els.description.value = '';
-      showMessage(`Додано: ${formatSigned(saved.type, saved.amount_minor)}`);
-    }
+    const saved = await api('POST', '/transactions', payload);
+    // Keep type, date and category for fast entry of the next one; clear the rest.
+    els.amount.value = '';
+    els.description.value = '';
+    showMessage(`Додано: ${formatSigned(saved.type, saved.amount_minor)}`);
     // Jump to the period that contains the saved date, so the row is visible.
     const { from, to } = currentRange();
     if (payload.occurred_on < from || payload.occurred_on > to) state.anchor = payload.occurred_on;
@@ -328,14 +285,14 @@ function renderRow(tx) {
     ? h('span', { class: 'chip', style: { '--chip-color': tx.category_color || 'var(--muted)' } }, tx.category_name)
     : h('span', { class: 'chip chip-empty' }, 'без категорії');
 
-  return h('li', { class: `tx-row${state.editing?.id === tx.id ? ' is-editing' : ''}` },
+  return h('li', { class: 'tx-row' },
     h('div', { class: 'tx-main' },
       categoryEl,
       tx.description && h('span', { class: 'tx-description' }, tx.description),
     ),
     h('span', { class: `tx-amount ${tx.type}` }, formatSigned(tx.type, tx.amount_minor)),
     h('div', { class: 'tx-actions' },
-      h('button', { type: 'button', class: 'btn-icon', title: 'Редагувати', 'aria-label': 'Редагувати', onclick: () => startEdit(tx) }, '✎'),
+      h('button', { type: 'button', class: 'btn-icon', title: 'Редагувати', 'aria-label': 'Редагувати', onclick: () => openTxModal({ tx, onChanged: loadList }) }, '✎'),
       h('button', { type: 'button', class: 'btn-icon danger', title: 'Видалити', 'aria-label': 'Видалити', onclick: () => deleteTx(tx) }, '✕'),
     ),
   );
@@ -346,7 +303,6 @@ async function deleteTx(tx) {
   if (!confirm(`Видалити операцію ${formatSigned(tx.type, tx.amount_minor)}${what ? ` (${what})` : ''}?`)) return;
   try {
     await api('DELETE', `/transactions/${tx.id}`);
-    if (state.editing?.id === tx.id) stopEdit();
     await loadList();
   } catch (err) {
     alert(`Не вдалося видалити: ${err.message}`);
@@ -387,10 +343,6 @@ export function initTransactionsView() {
     }
   });
   els.form.addEventListener('submit', submitForm);
-  els.cancelEditBtn.addEventListener('click', stopEdit);
-  els.form.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && state.editing) stopEdit();
-  });
   els.prevBtn.addEventListener('click', () => shiftPeriod(-1));
   els.nextBtn.addEventListener('click', () => shiftPeriod(1));
   els.todayBtn.addEventListener('click', () => {
@@ -413,5 +365,5 @@ export function goToDay(iso) {
 // Called when the view becomes visible: category names/colors may have changed elsewhere.
 export function showTransactionsView() {
   loadList();
-  if (!state.editing) els.amount.focus();
+  els.amount.focus();
 }

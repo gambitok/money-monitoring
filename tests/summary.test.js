@@ -91,6 +91,35 @@ test('empty range returns zero totals and no rows', async () => {
   assert.equal(body.balance.total, 0);
 });
 
+test('GET /api/summary/years lists years with transactions, newest first', async () => {
+  const empty = await fetch(`${ctx.baseUrl}/api/summary/years`).then((r) => r.json());
+  assert.deepEqual(empty, { years: [] });
+
+  tx('expense', 100, '2024-04-13', food);
+  tx('expense', 100, '2026-01-01', food);
+  tx('income', 100, '2025-12-31', salary);
+  const { years } = await fetch(`${ctx.baseUrl}/api/summary/years`).then((r) => r.json());
+  assert.deepEqual(years, [2026, 2025, 2024]);
+});
+
+test('usd rate: weighted average of the period, all-time fallback, null without data', async () => {
+  assert.equal((await summary('from=2025-01&to=2025-12')).body.usd, null);
+
+  tx('income', 8899200, '2025-02-01', salary, '$2160 за курсом 41,2'); // 88 992 UAH
+  tx('income', 2869600, '2025-12-01', salary, '$680 за курсом 42,2'); // 28 696 UAH
+  tx('income', 1000000, '2025-03-01', salary, 'без курсу');
+
+  const year = (await summary('from=2025-01&to=2025-12')).body.usd;
+  assert.deepEqual(year, { rate: Math.round(((88992 + 28696) / (2160 + 680)) * 100) / 100, source: 'period' });
+
+  const dec = (await summary('from=2025-12&to=2025-12')).body.usd;
+  assert.deepEqual(dec, { rate: 42.2, source: 'period' });
+
+  const before = (await summary('from=2024-01&to=2024-12')).body.usd;
+  assert.equal(before.source, 'all');
+  assert.equal(before.rate, year.rate);
+});
+
 test('validates the range', async () => {
   for (const [query, field] of [
     ['from=2026-13&to=2026-12', 'from'],

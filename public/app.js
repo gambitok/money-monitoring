@@ -2,12 +2,16 @@
 import { $ } from './lib.js';
 import * as categories from './categories-store.js';
 import { initTransactionsView, showTransactionsView } from './transactions-view.js';
+import { initMonthView, showMonthView } from './month-view.js';
 import { initSummaryView, showSummaryView } from './summary-view.js';
+import { initStatsView, showStatsView } from './stats-view.js';
 import { initCategoriesView, showCategoriesView } from './categories-view.js';
 
 const views = {
   transactions: { hash: '#/', el: $('viewTransactions'), show: showTransactionsView, title: 'Операції' },
+  month: { hash: '#/month', el: $('viewMonth'), show: showMonthView, title: 'Місяць' },
   summary: { hash: '#/summary', el: $('viewSummary'), show: showSummaryView, title: 'Зведення' },
+  stats: { hash: '#/stats', el: $('viewStats'), show: showStatsView, title: 'Статистика' },
   categories: { hash: '#/categories', el: $('viewCategories'), show: showCategoriesView, title: 'Категорії' },
 };
 
@@ -28,7 +32,9 @@ function route() {
 
 async function init() {
   initTransactionsView();
+  initMonthView();
   initSummaryView();
+  initStatsView();
   initCategoriesView();
   try {
     await categories.load();

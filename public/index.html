@@ -12,7 +12,9 @@
       <h1>Money Monitoring</h1>
       <nav class="app-nav" aria-label="Розділи">
         <a href="#/" data-view="transactions">Операції</a>
+        <a href="#/month" data-view="month">Місяць</a>
         <a href="#/summary" data-view="summary">Зведення</a>
+        <a href="#/stats" data-view="stats">Статистика</a>
         <a href="#/categories" data-view="categories">Категорії</a>
       </nav>
     </div>
@@ -65,7 +67,6 @@
 
           <div class="form-actions">
             <button type="submit" id="submitBtn" class="btn-primary">Додати</button>
-            <button type="button" id="cancelEditBtn" class="btn-ghost" hidden>Скасувати</button>
             <span id="formMessage" class="form-message" role="status"></span>
           </div>
         </form>
@@ -95,17 +96,59 @@
       </section>
     </div>
 
+    <!-- ===== Місяць: дні × категорії, як у старій таблиці ===== -->
+    <div id="viewMonth" class="view" hidden>
+      <section class="card" aria-labelledby="monthLabel">
+        <div class="period-bar">
+          <div class="period-nav">
+            <button type="button" id="monthPrev" class="btn-icon" aria-label="Попередній місяць">‹</button>
+            <h2 id="monthLabel" class="period-label"></h2>
+            <button type="button" id="monthNext" class="btn-icon" aria-label="Наступний місяць">›</button>
+          </div>
+          <div class="month-pick">
+            <label><span class="visually-hidden">Місяць</span><input id="monthInput" type="month" required></label>
+            <button type="button" id="monthToday" class="btn-ghost">Цей місяць</button>
+          </div>
+        </div>
+
+        <div class="totals">
+          <div class="stat"><span class="stat-label">Доходи</span><span id="monthIncome" class="stat-value income"></span></div>
+          <div class="stat"><span class="stat-label">Витрати</span><span id="monthExpense" class="stat-value expense"></span></div>
+          <div class="stat"><span class="stat-label">Баланс</span><span id="monthBalance" class="stat-value"></span></div>
+        </div>
+
+        <div class="pivot-wrap month-wrap">
+          <table id="monthTable" class="pivot month-table"></table>
+        </div>
+        <p id="monthError" class="field-error" role="alert"></p>
+        <p class="muted pivot-hint">Клік по клітинці — редагувати (або вибрати з кількох операцій), по порожній — додати витрату в цю категорію на цей день, по «Разом» дня — усі операції дня. Підсвітка: понад 2 000 ₴ і понад 10 000 ₴. Клік по даті відкриває день в «Операціях».</p>
+      </section>
+
+      <section class="card month-income" aria-labelledby="monthIncomeTitle">
+        <div class="month-income-head">
+          <h3 id="monthIncomeTitle" class="card-title month-income-title">Доходи за місяць</h3>
+          <button type="button" id="monthAddIncome" class="btn-ghost btn-small">+ Додати дохід</button>
+        </div>
+        <div id="monthIncomeList"></div>
+      </section>
+    </div>
+
     <!-- ===== Зведення ===== -->
     <div id="viewSummary" class="view" hidden>
       <section class="card" aria-labelledby="summaryTitle">
         <h2 id="summaryTitle" class="visually-hidden">Зведена таблиця</h2>
         <div class="summary-bar">
-          <div id="summaryPresets" class="segmented segmented-wrap" role="group" aria-label="Період">
-            <button type="button" data-preset="3m">3 міс</button>
-            <button type="button" data-preset="6m">6 міс</button>
-            <button type="button" data-preset="12m">12 міс</button>
-            <button type="button" data-preset="year">Цей рік</button>
-            <button type="button" data-preset="prevYear">Минулий рік</button>
+          <div class="summary-presets">
+            <div id="summaryPresets" class="segmented segmented-wrap" role="group" aria-label="Останні місяці">
+              <button type="button" data-preset="3m">3 міс</button>
+              <button type="button" data-preset="6m">6 міс</button>
+              <button type="button" data-preset="12m">12 міс</button>
+            </div>
+            <!-- Options filled from /api/summary/years: the years that have data, newest first. -->
+            <label class="summary-year">
+              <span class="visually-hidden">Рік</span>
+              <select id="summaryYear"></select>
+            </label>
           </div>
           <div class="summary-range">
             <label><span class="visually-hidden">З місяця</span><input id="summaryFrom" type="month" required></label>
@@ -116,11 +159,12 @@
         <p id="summaryRangeError" class="field-error" role="alert"></p>
 
         <div class="totals totals-4">
-          <div class="stat"><span class="stat-label">Доходи</span><span id="summaryIncome" class="stat-value income"></span></div>
-          <div class="stat"><span class="stat-label">Витрати</span><span id="summaryExpense" class="stat-value expense"></span></div>
-          <div class="stat"><span class="stat-label">Баланс</span><span id="summaryBalance" class="stat-value"></span></div>
-          <div class="stat"><span class="stat-label">Витрати в середньому / міс</span><span id="summaryAvgExpense" class="stat-value"></span></div>
+          <div class="stat"><span class="stat-label">Доходи</span><span id="summaryIncome" class="stat-value income"></span><span class="stat-usd" data-usd-for="summaryIncome"></span></div>
+          <div class="stat"><span class="stat-label">Витрати</span><span id="summaryExpense" class="stat-value expense"></span><span class="stat-usd" data-usd-for="summaryExpense"></span></div>
+          <div class="stat"><span class="stat-label">Баланс</span><span id="summaryBalance" class="stat-value"></span><span class="stat-usd" data-usd-for="summaryBalance"></span></div>
+          <div class="stat"><span class="stat-label">Витрати в середньому / міс</span><span id="summaryAvgExpense" class="stat-value"></span><span class="stat-usd" data-usd-for="summaryAvgExpense"></span></div>
         </div>
+        <p id="summaryUsdRate" class="muted stat-usd-rate"></p>
 
         <div class="pivot-wrap">
           <table id="pivotTable" class="pivot"></table>
@@ -138,6 +182,75 @@
           <button type="button" id="drillClose" class="btn-icon" aria-label="Закрити">✕</button>
         </div>
         <div id="drillList"></div>
+      </section>
+    </div>
+
+    <!-- ===== Статистика покупок ===== -->
+    <div id="viewStats" class="view" hidden>
+      <section class="card" aria-labelledby="statsTitle">
+        <h2 id="statsTitle" class="visually-hidden">Статистика покупок</h2>
+        <div class="stats-filters">
+          <div id="statsType" class="type-toggle" role="radiogroup" aria-label="Тип">
+            <button type="button" role="radio" data-type="expense" aria-checked="true">Витрати</button>
+            <button type="button" role="radio" data-type="income" aria-checked="false">Доходи</button>
+          </div>
+          <label class="stats-period">
+            <span class="visually-hidden">Період</span>
+            <select id="statsPeriod"></select>
+          </label>
+          <div class="summary-range">
+            <label><span class="visually-hidden">З дати</span><input id="statsFrom" type="date"></label>
+            <span aria-hidden="true">–</span>
+            <label><span class="visually-hidden">По дату</span><input id="statsTo" type="date"></label>
+          </div>
+        </div>
+
+        <label class="field stats-search">
+          <span>Пошук в описі <em class="muted">— кома означає «або»: <code>steam, lifecell</code>; слова через пробіл мають бути всі: <code>кава атб</code></em></span>
+          <input id="statsQuery" type="search" placeholder="напр. steam, барбер, кава" autocomplete="off">
+        </label>
+
+        <div class="stats-cats-head">
+          <span class="muted">Категорії</span>
+          <button type="button" id="statsCatsAll" class="link-btn">усі</button>
+        </div>
+        <div id="statsCats" class="stats-cats" role="group" aria-label="Категорії"></div>
+
+        <div class="totals totals-4">
+          <div class="stat"><span class="stat-label">Сума</span><span id="statsSum" class="stat-value"></span></div>
+          <div class="stat"><span class="stat-label">Кількість операцій</span><span id="statsCount" class="stat-value"></span></div>
+          <div class="stat"><span class="stat-label">Середня операція</span><span id="statsAvg" class="stat-value"></span></div>
+          <div class="stat"><span class="stat-label">В середньому / міс</span><span id="statsPerMonth" class="stat-value"></span><span id="statsPerMonthHint" class="stat-usd"></span></div>
+        </div>
+        <p id="statsError" class="field-error" role="alert"></p>
+      </section>
+
+      <div class="stats-grid">
+        <section class="card" aria-labelledby="statsByCatTitle">
+          <h3 id="statsByCatTitle" class="card-title">По категоріях</h3>
+          <div id="statsByCat"></div>
+        </section>
+        <section class="card" aria-labelledby="statsByMonthTitle">
+          <h3 id="statsByMonthTitle" class="card-title">По місяцях</h3>
+          <div id="statsByMonth"></div>
+        </section>
+      </div>
+
+      <div class="stats-grid">
+        <section class="card" aria-labelledby="statsTopTitle">
+          <h3 id="statsTopTitle" class="card-title">Найчастіші описи</h3>
+          <div id="statsTop"></div>
+        </section>
+        <section class="card" aria-labelledby="statsWordsTitle">
+          <h3 id="statsWordsTitle" class="card-title">Слова в описах</h3>
+          <p class="muted stats-note">Скільки днів згадується слово і сума тих операцій. Операція з кількома словами рахується в кожному. Клік додає слово в пошук.</p>
+          <div id="statsWords" class="stats-words"></div>
+        </section>
+      </div>
+
+      <section class="card" aria-labelledby="statsListTitle">
+        <h3 id="statsListTitle" class="card-title">Операції</h3>
+        <div id="statsList"></div>
       </section>
     </div>
 
