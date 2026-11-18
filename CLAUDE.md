@@ -33,7 +33,7 @@
 
 ## Модель даних
 
-Схема — у міграції 1 в `src/db.js`. Дві таблиці:
+Схема — у міграції 1 в `src/db.js`. Міграція 2 додає стартові категорії власника (`DEFAULT_CATEGORIES_V2`: 11 витрат, 5 доходів). Вона пропускає назви, які вже є (без урахування регістру), і виконується один раз, тож видалені користувачем категорії не повертаються. Цей список не редагуй: нові дефолти додавай окремою міграцією. Через сід свіжа БД (і в тестах теж) уже містить категорії, тому тести, яким потрібен порожній список, роблять `DELETE FROM categories` у `beforeEach`. Дві таблиці:
 
 - `categories`: `name`, `type` (`income`/`expense`), `color`, `archived_at`, `created_at`. Пара `(name, type)` унікальна.
 - `transactions`: `type`, `amount_minor`, `currency` (`'UAH'`), `occurred_on` (`YYYY-MM-DD`), `category_id` (nullable), `description`, `source` (`manual`/`import`), `import_hash` (унікальний, nullable), `created_at`, `updated_at`. Індекси по `occurred_on` і `category_id`.

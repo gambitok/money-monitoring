@@ -79,7 +79,7 @@ test('a used category cannot be deleted or change type', () => {
     () => db.prepare("UPDATE categories SET type = 'income' WHERE id = ?").run(food),
     /cannot change type/,
   );
-  db.prepare("UPDATE categories SET name = 'Продукти' WHERE id = ?").run(food);
+  db.prepare("UPDATE categories SET name = 'Харчі' WHERE id = ?").run(food);
 });
 
 test('an unused category can change type', () => {

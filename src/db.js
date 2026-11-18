@@ -62,7 +62,43 @@ export const migrations = [
       SELECT RAISE(ABORT, 'cannot change type of a category that has transactions');
     END;
   `),
+
+  // 2: the owner's starter categories. Runs once: categories deleted later do not come back.
+  (db) => seedCategories(db, DEFAULT_CATEGORIES_V2),
 ];
+
+// Frozen snapshot used by migration 2. Do not edit: a changed list would not reach databases
+// that already ran it. Add a new migration for new defaults instead.
+export const DEFAULT_CATEGORIES_V2 = Object.freeze([
+  ['expense', 'Продукти', '#16a34a'],
+  ['expense', 'Цигарки', '#78716c'],
+  ['expense', 'Алкоголь', '#9333ea'],
+  ['expense', 'Кафе, ресторани, доставка', '#ea580c'],
+  ['expense', 'Транспорт', '#2563eb'],
+  ['expense', 'Товари для дому', '#ca8a04'],
+  ['expense', 'Одяг', '#db2777'],
+  ['expense', 'Комунальні платежі', '#0891b2'],
+  ['expense', 'Підписки', '#4f46e5'],
+  ['expense', "Здоров'я", '#e11d48'],
+  ['expense', 'Інше', '#6b7280'],
+  ['income', 'Зарплата (державна)', '#2563eb'],
+  ['income', 'Зарплата (IT-компанія)', '#16a34a'],
+  ['income', 'Фриланс', '#ca8a04'],
+  ['income', 'Виведення криптовалюти', '#9333ea'],
+  ['income', 'Інші доходи', '#6b7280'],
+]);
+
+// Skips names that already exist in the same type, case-insensitively (Cyrillic included).
+function seedCategories(db, list) {
+  const existing = new Set(
+    db.prepare('SELECT type, name FROM categories').all()
+      .map((c) => `${c.type}:${c.name.toLocaleLowerCase('uk')}`),
+  );
+  const insert = db.prepare('INSERT INTO categories (type, name, color) VALUES (?, ?, ?)');
+  for (const [type, name, color] of list) {
+    if (!existing.has(`${type}:${name.toLocaleLowerCase('uk')}`)) insert.run(type, name, color);
+  }
+}
 
 export function openDb(file) {
   if (file !== ':memory:') {
