@@ -101,7 +101,11 @@ export function categoriesRouter(db) {
     }
     if (value.name !== existing.name || value.type !== existing.type) assertUniqueName(value, existing.id);
 
-    updateRow.run({ ...value, archived_at: archivedAt, id: existing.id });
+    db.transaction(() => {
+      // A plan of the other type would no longer fit the category (and the budget trigger forbids it).
+      if (value.type !== existing.type) db.prepare('DELETE FROM budgets WHERE category_id = ?').run(existing.id);
+      updateRow.run({ ...value, archived_at: archivedAt, id: existing.id });
+    })();
     res.json(getRow.get(existing.id));
   });
 

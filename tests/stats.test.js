@@ -111,6 +111,15 @@ test('words skip the searched words themselves', async () => {
   assert.ok(body.words.some((w) => w.word === 'атб'));
 });
 
+test('usd rate for the period, all-time fallback', async () => {
+  assert.equal((await stats()).body.usd, null);
+  const tx = ctx.db.prepare('INSERT INTO transactions (type, amount_minor, occurred_on, category_id, description) VALUES (?, ?, ?, ?, ?)');
+  tx.run('income', 4300000, '2026-02-01', salary, '$1000 за курсом 43');
+  assert.deepEqual((await stats('from=2026-02-01&to=2026-02-28')).body.usd, { rate: 43, source: 'period' });
+  assert.deepEqual((await stats('from=2025-01-01&to=2025-12-31')).body.usd, { rate: 43, source: 'all' });
+  assert.deepEqual((await stats()).body.usd, { rate: 43, source: 'period' });
+});
+
 test('validates parameters', async () => {
   const res = await stats('from=2026-02-30&type=x&category_ids=abc');
   assert.equal(res.status, 400);

@@ -10,6 +10,9 @@
   --income: #15803d;
   --expense: #b91c1c;
   --danger: #b91c1c;
+  --plan-ok: #16a34a;
+  --plan-warn: #ca8a04;
+  --plan-over: #dc2626;
   --radius: 10px;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-size: 15px;
@@ -28,6 +31,9 @@
     --income: #4ade80;
     --expense: #f87171;
     --danger: #f87171;
+    --plan-ok: #4ade80;
+    --plan-warn: #facc15;
+    --plan-over: #f87171;
   }
 }
 
@@ -534,6 +540,8 @@ button:disabled { cursor: default; opacity: 0.5; }
   left: 0;
   z-index: 1;
   background: var(--surface);
+  /* .pivot-wrap has 16px side padding; cover it so scrolled cells don't peek out left of the sticky column. */
+  box-shadow: -16px 0 0 0 var(--row-bg, var(--surface));
   text-align: left;
   min-width: 150px;
   max-width: 220px;
@@ -668,7 +676,11 @@ main:has(#viewSummary:not([hidden])) { max-width: 1400px; }
 .month-table tbody td.month-cell.heat-1 { background: color-mix(in srgb, var(--expense) 16%, var(--row-bg)); }
 .month-table tbody td.month-cell.heat-2 { background: color-mix(in srgb, var(--expense) 38%, var(--row-bg)); font-weight: 700; }
 
-.month-table td.month-cell, .month-table td.pivot-total { padding: 0 2px; }
+.month-table td.month-cell { padding: 0 2px; }
+.month-table td.pivot-total { padding: 4px 8px; }
+
+/* Vertical divider between the category columns and the read-only "Разом", through header, rows and totals. */
+.month-table .month-sep { border-left: 2px solid var(--muted); }
 .month-table .cell-btn { padding: 4px; }
 .month-add { color: transparent; }
 .month-add:hover, .month-add:focus-visible { color: var(--accent); background: var(--surface-2); }
@@ -790,3 +802,73 @@ main:has(#viewStats:not([hidden])) { max-width: 1400px; }
 }
 .modal-list { margin: 8px 0; }
 .danger-text { color: var(--danger); margin-left: auto; }
+
+/* ---------- home: plan vs actual ---------- */
+
+.home-actions { display: flex; gap: 8px; align-items: center; }
+.home-side { display: grid; gap: 16px; align-content: start; }
+.home-tiles .stat { align-content: start; }
+
+/* Owner's rule: under plan green, close (>= 85 %) yellow, over plan red. */
+.plan-track {
+  position: relative;
+  display: block;
+  height: 8px;
+  margin-top: 4px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  overflow: visible;
+}
+.stat .plan-track { background: var(--border); }
+.plan-fill { display: block; height: 100%; border-radius: 4px; background: var(--muted); }
+.plan-ok .plan-fill { background: var(--plan-ok); }
+.plan-warn .plan-fill { background: var(--plan-warn); }
+.plan-over .plan-fill { background: var(--plan-over); }
+.plan-progress .plan-fill { background: var(--accent); }
+.plan-none .plan-fill { background: var(--muted); opacity: 0.45; }
+.plan-pace {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--text);
+  opacity: 0.55;
+  border-radius: 1px;
+}
+
+.plan-caption { font-size: 0.78rem; }
+.plan-text-ok { color: var(--plan-ok); }
+.plan-text-warn { color: var(--plan-warn); }
+.plan-text-over { color: var(--plan-over); }
+
+.plan-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.plan-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  align-items: center;
+}
+.plan-row .chip { justify-self: start; white-space: normal; }
+.plan-row .plan-track, .plan-row .plan-caption { grid-column: 1 / -1; }
+.plan-amount { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* plans editor */
+.modal-wide { width: min(760px, calc(100vw - 32px)); }
+.plans-hint { font-size: 0.85rem; margin: 0 0 12px; }
+.plans-groups { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+@media (min-width: 640px) { .plans-groups { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.plan-edit-group { display: grid; gap: 6px; align-content: start; }
+.plan-edit-title { margin: 0 0 4px; font-size: 0.95rem; }
+.plan-edit-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.plan-edit-input { display: flex; align-items: center; gap: 4px; }
+.plan-edit-input input {
+  width: 110px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.plan-edit-input input[aria-invalid='true'] { border-color: var(--danger); }
+.plans-form .form-message:empty { display: none; }

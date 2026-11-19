@@ -65,6 +65,38 @@ export const migrations = [
 
   // 2: the owner's starter categories. Runs once: categories deleted later do not come back.
   (db) => seedCategories(db, DEFAULT_CATEGORIES_V2),
+
+  // 3: monthly plans (budgets). One overall plan per type (category_id NULL) and at most one per
+  // category; the same plan applies to every month.
+  (db) => db.exec(`
+    CREATE TABLE budgets (
+      id           INTEGER PRIMARY KEY,
+      type         TEXT NOT NULL CHECK (type IN ('income', 'expense')),
+      category_id  INTEGER REFERENCES categories (id) ON DELETE CASCADE,
+      amount_minor INTEGER NOT NULL CHECK (typeof(amount_minor) = 'integer' AND amount_minor > 0),
+      created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+    );
+
+    CREATE UNIQUE INDEX budgets_total_per_type ON budgets (type) WHERE category_id IS NULL;
+    CREATE UNIQUE INDEX budgets_per_category ON budgets (category_id) WHERE category_id IS NOT NULL;
+
+    CREATE TRIGGER budgets_category_type_insert
+    BEFORE INSERT ON budgets
+    WHEN NEW.category_id IS NOT NULL
+     AND EXISTS (SELECT 1 FROM categories WHERE id = NEW.category_id AND type IS NOT NEW.type)
+    BEGIN
+      SELECT RAISE(ABORT, 'category type does not match budget type');
+    END;
+
+    CREATE TRIGGER budgets_category_type_update
+    BEFORE UPDATE OF type, category_id ON budgets
+    WHEN NEW.category_id IS NOT NULL
+     AND EXISTS (SELECT 1 FROM categories WHERE id = NEW.category_id AND type IS NOT NEW.type)
+    BEGIN
+      SELECT RAISE(ABORT, 'category type does not match budget type');
+    END;
+  `),
 ];
 
 // Frozen snapshot used by migration 2. Do not edit: a changed list would not reach databases

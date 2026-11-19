@@ -30,7 +30,25 @@ const els = {
 const state = {
   month: todayIso().slice(0, 7),
   items: [],
+  usd: null, // { rate, source } from /api/usd-rate
 };
+
+const usdFmt = new Intl.NumberFormat('uk-UA', { maximumFractionDigits: 0 });
+const rateFmt = new Intl.NumberFormat('uk-UA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// Small "≈ $X" lines under the tiles at the month's average freelance rate, as in the summary.
+function renderUsd(values) {
+  const rate = state.usd?.rate;
+  for (const [id, minor] of Object.entries(values)) {
+    const usd = rate ? Math.round(minor / 100 / rate) : null;
+    $(id).textContent = usd === null ? '' : `≈ ${usd < 0 ? '−' : ''}$${usdFmt.format(Math.abs(usd))}`;
+  }
+  $('monthUsdRate').textContent = rate
+    ? `Курс $: ${rateFmt.format(rate)} ₴ — ${state.usd.source === 'period'
+      ? 'середній за місяць (за доходами з фрилансу)'
+      : 'середній за весь час (у цьому місяці курсу немає)'}`
+    : '';
+}
 
 let loadSeq = 0;
 
@@ -81,9 +99,15 @@ async function load() {
   const days = daysOf(state.month);
   const seq = ++loadSeq;
   try {
-    const { items } = await api('GET', `/transactions?from=${days[0]}&to=${days.at(-1)}`);
+    const range = `from=${days[0]}&to=${days.at(-1)}`;
+    const [{ items }, { usd }] = await Promise.all([
+      api('GET', `/transactions?${range}`),
+      // The rate is a nicety: an old server without /usd-rate must not break the table.
+      api('GET', `/usd-rate?${range}`).catch(() => ({ usd: null })),
+    ]);
     if (seq !== loadSeq) return;
     state.items = items;
+    state.usd = usd;
     render();
   } catch (err) {
     if (seq !== loadSeq) return;
@@ -120,6 +144,7 @@ function render() {
   els.income.textContent = formatMoney(incomeTotal);
   els.balance.textContent = `${balance < 0 ? '−' : ''}${formatMoney(Math.abs(balance))}`;
   els.balance.className = `stat-value ${balance < 0 ? 'expense' : balance > 0 ? 'income' : ''}`;
+  renderUsd({ monthIncomeUsd: incomeTotal, monthExpenseUsd: expenseTotal, monthBalanceUsd: balance });
 
   const today = todayIso();
 
@@ -128,7 +153,7 @@ function render() {
       h('th', { scope: 'col', class: 'pivot-cat month-day' }, 'Дата'),
       columns.map((c) => h('th', { scope: 'col', class: 'num month-col', title: c.name },
         h('span', { class: 'month-col-name', style: { '--chip-color': c.color || 'var(--muted)' } }, c.name))),
-      h('th', { scope: 'col', class: 'num pivot-total' }, 'Разом'),
+      h('th', { scope: 'col', class: 'num pivot-total month-sep' }, 'Разом'),
       h('th', { scope: 'col', class: 'month-desc' }, 'Опис'),
     ),
   );
@@ -143,7 +168,7 @@ function render() {
         h('th', { scope: 'row', class: 'pivot-cat month-day' },
           h('button', {
             type: 'button', class: 'link-btn month-day-btn', title: 'Відкрити день в «Операціях»',
-            onclick: () => { goToDay(day); location.hash = '#/'; },
+            onclick: () => { goToDay(day); location.hash = '#/ops'; },
           }, `${day.slice(8)}.${day.slice(5, 7)}`),
           h('span', { class: 'muted month-weekday' }, weekdayFmt.format(isoToUtc(day))),
         ),
@@ -163,13 +188,8 @@ function render() {
             h('button', { type: 'button', class: 'cell-btn', title, onclick: () => openCell(cell.items, label, defaults) },
               formatWhole(cell.sum)));
         }),
-        h('td', { class: 'num pivot-total' }, dayTotal
-          ? h('button', {
-            type: 'button', class: 'cell-btn', title: 'Усі операції дня',
-            onclick: () => openCell([...row.values()].flatMap((cell) => cell.items),
-              `Витрати за ${day.slice(8)}.${day.slice(5, 7)}`, { type: 'expense', occurred_on: day }),
-          }, formatWhole(dayTotal))
-          : ''),
+        // Read-only: the day total is derived, edit the category cells instead (owner's choice).
+        h('td', { class: 'num pivot-total month-sep', title: dayTotal ? formatMoney(dayTotal) : null }, dayTotal ? formatWhole(dayTotal) : ''),
         h('td', { class: 'month-desc' }, descriptions.join(', ')),
       );
     }),
@@ -180,7 +200,7 @@ function render() {
       h('th', { scope: 'row', class: 'pivot-cat month-day' }, 'Разом'),
       columns.map((c) => h('td', { class: 'num', title: formatMoney(colTotals.get(c.key) ?? 0) },
         colTotals.get(c.key) ? formatWhole(colTotals.get(c.key)) : '·')),
-      h('td', { class: 'num pivot-total month-grand', title: formatMoney(expenseTotal) }, formatWhole(expenseTotal)),
+      h('td', { class: 'num pivot-total month-grand month-sep', title: formatMoney(expenseTotal) }, formatWhole(expenseTotal)),
       h('td', {}, ''),
     ),
   );

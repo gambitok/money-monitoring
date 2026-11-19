@@ -151,6 +151,22 @@ async function load() {
 
 // ---------- rendering ----------
 
+const usdFmt = new Intl.NumberFormat('uk-UA', { maximumFractionDigits: 0 });
+const rateFmt = new Intl.NumberFormat('uk-UA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// Small "≈ $X" lines under the tiles at the period's average freelance rate, as in the summary.
+function renderUsd(rate, source, values) {
+  for (const [id, minor] of Object.entries(values)) {
+    const usd = rate && minor !== null ? Math.round(minor / 100 / rate) : null;
+    $(id).textContent = usd === null ? '' : `≈ $${usdFmt.format(usd)}`;
+  }
+  $('statsUsdRate').textContent = rate
+    ? `Курс $: ${rateFmt.format(rate)} ₴ — ${source === 'period'
+      ? 'середній за період (за доходами з фрилансу)'
+      : 'середній за весь час (у цьому періоді курсу немає)'}`
+    : '';
+}
+
 function render(data) {
   const { totals } = data;
   const months = monthsSpanned(totals);
@@ -163,6 +179,11 @@ function render(data) {
   els.perMonthHint.textContent = months
     ? `${plural(months, ['місяць', 'місяці', 'місяців'])}, у ${plural(totals.months, ['з них була операція', 'з них були операції', 'з них були операції'])}`
     : '';
+  renderUsd(data.usd?.rate, data.usd?.source, {
+    statsSumUsd: totals.sum,
+    statsAvgUsd: totals.avg,
+    statsPerMonthUsd: months ? totals.sum / months : null,
+  });
 
   renderBars(els.byCat, data.byCategory.map((c) => ({
     label: c.category_id === null ? 'Без категорії' : c.name,
@@ -256,7 +277,7 @@ function renderList({ items, totals, truncated }) {
       h('div', { class: 'tx-main' },
         h('button', {
           type: 'button', class: 'link-btn drill-date', title: 'Відкрити цей день в «Операціях»',
-          onclick: () => { goToDay(tx.occurred_on); location.hash = '#/'; },
+          onclick: () => { goToDay(tx.occurred_on); location.hash = '#/ops'; },
         }, `${dayFmt.format(isoToUtc(tx.occurred_on))} ${tx.occurred_on.slice(0, 4)}`),
         tx.category_id
           ? h('span', { class: 'chip', style: { '--chip-color': tx.category_color || 'var(--muted)' } }, tx.category_name)

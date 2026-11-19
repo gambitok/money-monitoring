@@ -1,6 +1,7 @@
 // Entry point: hash routing between views. No bundler: native ES modules.
 import { $ } from './lib.js';
 import * as categories from './categories-store.js';
+import { initHomeView, showHomeView } from './home-view.js';
 import { initTransactionsView, showTransactionsView } from './transactions-view.js';
 import { initMonthView, showMonthView } from './month-view.js';
 import { initSummaryView, showSummaryView } from './summary-view.js';
@@ -8,7 +9,8 @@ import { initStatsView, showStatsView } from './stats-view.js';
 import { initCategoriesView, showCategoriesView } from './categories-view.js';
 
 const views = {
-  transactions: { hash: '#/', el: $('viewTransactions'), show: showTransactionsView, title: 'Операції' },
+  home: { hash: '#/', el: $('viewHome'), show: showHomeView, title: 'Головна' },
+  transactions: { hash: '#/ops', el: $('viewTransactions'), show: showTransactionsView, title: 'Операції' },
   month: { hash: '#/month', el: $('viewMonth'), show: showMonthView, title: 'Місяць' },
   summary: { hash: '#/summary', el: $('viewSummary'), show: showSummaryView, title: 'Зведення' },
   stats: { hash: '#/stats', el: $('viewStats'), show: showStatsView, title: 'Статистика' },
@@ -16,7 +18,7 @@ const views = {
 };
 
 function currentView() {
-  return Object.keys(views).find((key) => views[key].hash === location.hash) ?? 'transactions';
+  return Object.keys(views).find((key) => views[key].hash === location.hash) ?? 'home';
 }
 
 function route() {
@@ -31,6 +33,7 @@ function route() {
 }
 
 async function init() {
+  initHomeView();
   initTransactionsView();
   initMonthView();
   initSummaryView();

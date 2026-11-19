@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { TYPES, ValidationError, isValidDate } from '../validate.js';
 import { parseIdParam } from './params.js';
+import { createUsdRate } from '../usd.js';
 
 export const MAX_ITEMS = 1000;
 const TOP_DESCRIPTIONS = 30;
@@ -41,6 +42,7 @@ export function matchesQuery(description, query) {
 // category_ids (comma-separated ids and/or "none"), q (description search, see parseQuery).
 export function statsRouter(db) {
   const router = Router();
+  const usdRate = createUsdRate(db);
 
   router.get('/', (req, res) => {
     const errors = {};
@@ -106,6 +108,7 @@ export function statsRouter(db) {
       words: topWords(items, query),
       items: items.slice(0, MAX_ITEMS),
       truncated: items.length > MAX_ITEMS,
+      usd: usdRate({ from: params.from ?? null, to: params.to ?? null }), // { rate, source } | null
     });
   });
 

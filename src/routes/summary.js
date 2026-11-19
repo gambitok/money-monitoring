@@ -1,9 +1,8 @@
 import { Router } from 'express';
+import { createUsdRate } from '../usd.js';
 import { ValidationError } from '../validate.js';
 
 export const MAX_MONTHS = 60;
-
-const USD_RATE_RE = /\$(\d+(?:,\d+)?) за курсом \d+(?:,\d+)?/;
 
 const collator = new Intl.Collator('uk', { sensitivity: 'base', numeric: true });
 
@@ -15,6 +14,11 @@ function isValidMonth(value) {
 function nextMonth(month) {
   const [y, m] = month.split('-').map(Number);
   return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+}
+
+function lastDayOf(month) {
+  const [y, m] = month.split('-').map(Number);
+  return `${month}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`;
 }
 
 function monthRange(from, to) {
@@ -43,29 +47,7 @@ export function summaryRouter(db) {
     SELECT DISTINCT CAST(substr(occurred_on, 1, 4) AS INTEGER) AS year FROM transactions ORDER BY year DESC
   `).pluck();
 
-  // USD rate: income descriptions written as "$2215 за курсом 43" (freelance, see the legacy import).
-  const ratedIncome = db.prepare(`
-    SELECT amount_minor, description FROM transactions
-    WHERE type = 'income' AND description LIKE '%за курсом%'
-      AND (@start IS NULL OR (occurred_on >= @start AND occurred_on < @end))
-  `);
-
-  // Weighted average rate (total UAH / total USD) of the period; if the period has no rated
-  // income (e.g. 2024), the all-time average. null when no rate is known at all.
-  function usdRate(start, end) {
-    for (const [source, params] of [['period', { start, end }], ['all', { start: null, end: null }]]) {
-      let uah = 0;
-      let usd = 0;
-      for (const row of ratedIncome.all(params)) {
-        const m = USD_RATE_RE.exec(row.description);
-        if (!m) continue;
-        uah += row.amount_minor / 100;
-        usd += Number(m[1].replace(',', '.'));
-      }
-      if (usd > 0) return { rate: Math.round((uah / usd) * 100) / 100, source };
-    }
-    return null;
-  }
+  const usdRate = createUsdRate(db);
 
   // Years that have at least one transaction, newest first (for the year buttons).
   router.get('/years', (req, res) => {
@@ -125,7 +107,7 @@ export function summaryRouter(db) {
 
     res.json({
       from, to, months, ...sections, balance,
-      usd: usdRate(`${from}-01`, `${nextMonth(to)}-01`), // { rate, source: 'period' | 'all' } | null
+      usd: usdRate({ from: `${from}-01`, to: lastDayOf(to) }), // { rate, source: 'period' | 'all' } | null
     });
   });
 

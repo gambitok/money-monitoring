@@ -323,7 +323,7 @@ function renderDrillRow(tx, showCategory) {
     h('div', { class: 'tx-main' },
       h('button', {
         type: 'button', class: 'link-btn drill-date', title: 'Відкрити цей день в «Операціях»',
-        onclick: () => { goToDay(tx.occurred_on); location.hash = '#/'; },
+        onclick: () => { goToDay(tx.occurred_on); location.hash = '#/ops'; },
       }, dayFmt.format(isoToUtc(tx.occurred_on))),
       showCategory && (tx.category_id
         ? h('span', { class: 'chip', style: { '--chip-color': tx.category_color || 'var(--muted)' } }, tx.category_name)

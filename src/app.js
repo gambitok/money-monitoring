@@ -1,10 +1,13 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
+import { budgetsRouter } from './routes/budgets.js';
 import { categoriesRouter } from './routes/categories.js';
+import { dashboardRouter } from './routes/dashboard.js';
 import { statsRouter } from './routes/stats.js';
 import { summaryRouter } from './routes/summary.js';
 import { transactionsRouter } from './routes/transactions.js';
+import { usdRouter } from './routes/usd.js';
 
 const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 
@@ -22,6 +25,9 @@ export function createApp({ db }) {
   app.use('/api/categories', categoriesRouter(db));
   app.use('/api/summary', summaryRouter(db));
   app.use('/api/stats', statsRouter(db));
+  app.use('/api/usd-rate', usdRouter(db));
+  app.use('/api/budgets', budgetsRouter(db));
+  app.use('/api/dashboard', dashboardRouter(db));
 
   app.use('/api', (req, res) => {
     res.status(404).json({ error: 'Not found' });

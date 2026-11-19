@@ -11,7 +11,8 @@
     <div class="app-header-inner">
       <h1>Money Monitoring</h1>
       <nav class="app-nav" aria-label="Розділи">
-        <a href="#/" data-view="transactions">Операції</a>
+        <a href="#/" data-view="home">Головна</a>
+        <a href="#/ops" data-view="transactions">Операції</a>
         <a href="#/month" data-view="month">Місяць</a>
         <a href="#/summary" data-view="summary">Зведення</a>
         <a href="#/stats" data-view="stats">Статистика</a>
@@ -21,8 +22,45 @@
   </header>
 
   <main>
+    <!-- ===== Головна: поточний місяць і плани ===== -->
+    <div id="viewHome" class="view">
+      <section class="card" aria-labelledby="homeLabel">
+        <div class="period-bar">
+          <div class="period-nav">
+            <button type="button" id="homePrev" class="btn-icon" aria-label="Попередній місяць">‹</button>
+            <h2 id="homeLabel" class="period-label"></h2>
+            <button type="button" id="homeNext" class="btn-icon" aria-label="Наступний місяць">›</button>
+          </div>
+          <div class="home-actions">
+            <button type="button" id="homeToday" class="btn-ghost">Цей місяць</button>
+            <button type="button" id="homePlans" class="btn-primary btn-small">Плани</button>
+          </div>
+        </div>
+        <div id="homeTiles" class="totals totals-4 home-tiles"></div>
+        <p id="homeUsdRate" class="muted stat-usd-rate"></p>
+        <p id="homeError" class="field-error" role="alert"></p>
+      </section>
+
+      <div class="stats-grid">
+        <section class="card" aria-labelledby="homeExpenseTitle">
+          <h3 id="homeExpenseTitle" class="card-title">Витрати по категоріях</h3>
+          <div id="homeExpenseRows"></div>
+        </section>
+        <div class="home-side">
+          <section class="card" aria-labelledby="homeIncomeTitle">
+            <h3 id="homeIncomeTitle" class="card-title">Доходи по категоріях</h3>
+            <div id="homeIncomeRows"></div>
+          </section>
+          <section class="card" aria-labelledby="homeRecentTitle">
+            <h3 id="homeRecentTitle" class="card-title">Останні операції</h3>
+            <div id="homeRecent"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+
     <!-- ===== Операції ===== -->
-    <div id="viewTransactions" class="view">
+    <div id="viewTransactions" class="view" hidden>
       <section class="card" aria-labelledby="entryTitle">
         <h2 id="entryTitle" class="card-title">Нова операція</h2>
         <form id="entryForm" class="entry-form" novalidate autocomplete="off">
@@ -112,10 +150,11 @@
         </div>
 
         <div class="totals">
-          <div class="stat"><span class="stat-label">Доходи</span><span id="monthIncome" class="stat-value income"></span></div>
-          <div class="stat"><span class="stat-label">Витрати</span><span id="monthExpense" class="stat-value expense"></span></div>
-          <div class="stat"><span class="stat-label">Баланс</span><span id="monthBalance" class="stat-value"></span></div>
+          <div class="stat"><span class="stat-label">Доходи</span><span id="monthIncome" class="stat-value income"></span><span id="monthIncomeUsd" class="stat-usd"></span></div>
+          <div class="stat"><span class="stat-label">Витрати</span><span id="monthExpense" class="stat-value expense"></span><span id="monthExpenseUsd" class="stat-usd"></span></div>
+          <div class="stat"><span class="stat-label">Баланс</span><span id="monthBalance" class="stat-value"></span><span id="monthBalanceUsd" class="stat-usd"></span></div>
         </div>
+        <p id="monthUsdRate" class="muted stat-usd-rate"></p>
 
         <div class="pivot-wrap month-wrap">
           <table id="monthTable" class="pivot month-table"></table>
@@ -217,11 +256,12 @@
         <div id="statsCats" class="stats-cats" role="group" aria-label="Категорії"></div>
 
         <div class="totals totals-4">
-          <div class="stat"><span class="stat-label">Сума</span><span id="statsSum" class="stat-value"></span></div>
+          <div class="stat"><span class="stat-label">Сума</span><span id="statsSum" class="stat-value"></span><span id="statsSumUsd" class="stat-usd"></span></div>
           <div class="stat"><span class="stat-label">Кількість операцій</span><span id="statsCount" class="stat-value"></span></div>
-          <div class="stat"><span class="stat-label">Середня операція</span><span id="statsAvg" class="stat-value"></span></div>
-          <div class="stat"><span class="stat-label">В середньому / міс</span><span id="statsPerMonth" class="stat-value"></span><span id="statsPerMonthHint" class="stat-usd"></span></div>
+          <div class="stat"><span class="stat-label">Середня операція</span><span id="statsAvg" class="stat-value"></span><span id="statsAvgUsd" class="stat-usd"></span></div>
+          <div class="stat"><span class="stat-label">В середньому / міс</span><span id="statsPerMonth" class="stat-value"></span><span id="statsPerMonthUsd" class="stat-usd"></span><span id="statsPerMonthHint" class="stat-usd"></span></div>
         </div>
+        <p id="statsUsdRate" class="muted stat-usd-rate"></p>
         <p id="statsError" class="field-error" role="alert"></p>
       </section>
 
